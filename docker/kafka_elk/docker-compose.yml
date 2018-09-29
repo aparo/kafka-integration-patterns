@@ -1,0 +1,143 @@
+version: '2'
+
+services:
+
+  elasticsearch:
+    build: elasticsearch/
+    container_name: elasticsearch
+    volumes:
+      - /opt/dockerdata/elasticsearch:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      ES_JAVA_OPTS: "-Xmx1024m -Xms1024m"
+      discovery.type: "single-node"
+
+  kibana:
+    build: kibana/
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  cerebro:
+    build: cerebro/
+    container_name: cerebro
+    ports:
+      - "9001:9000"
+    depends_on:
+      - elasticsearch
+
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092"
+      - "1099"
+    environment:
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+#      KAFKA_ADVERTISED_LISTENERS: 172.19.0.1
+#      KAFKA_ADVERTISED_HOST_NAME: 192.168.99.100
+#      KAFKA_ADVERTISED_PORT: 9092
+#      KAFKA_PORT: 9092
+#      BROKER_ID_COMMAND: "docker inspect --format '{{ .Name }}' $$(hostname) | awk -F_ '{ printf $$NF }'"
+      BROKER_ID: 1001
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=kafka -Dcom.sun.management.jmxremote.rmi.port=1099"
+      JMX_PORT: 1099
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/dockerdata/kafka:/kafka
+    depends_on:
+      - zookeeper
+
+  kafka2:
+      image: wurstmeister/kafka
+      container_name: kafka2
+      ports:
+        - "9092"
+        - "1099"
+      environment:
+        KAFKA_LISTENERS: PLAINTEXT://:9092
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+  #      KAFKA_ADVERTISED_LISTENERS: 172.19.0.1
+  #      KAFKA_ADVERTISED_HOST_NAME: 192.168.99.100
+  #      KAFKA_ADVERTISED_PORT: 9092
+  #      KAFKA_PORT: 9092
+  #      BROKER_ID_COMMAND: "docker inspect --format '{{ .Name }}' $$(hostname) | awk -F_ '{ printf $$NF }'"
+        BROKER_ID: 1002
+        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+        KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=kafka -Dcom.sun.management.jmxremote.rmi.port=1099"
+        JMX_PORT: 1099
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /opt/dockerdata/kafka2:/kafka
+      depends_on:
+        - zookeeper
+
+  jmxexporter:
+    image: sscaling/jmx-prometheus-exporter
+    container_name: jmxexporter
+    ports:
+      - "5556:5556"
+    environment:
+      SERVICE_PORT: 5556
+    volumes:
+      - $PWD/jmxexporter.yml:/opt/jmx_exporter/config.yml
+    depends_on:
+      - kafka
+
+
+  kafka-manager:
+    image: sheepkiller/kafka-manager
+    container_name: kafka-manager
+    ports:
+      - "9000:9000"
+    depends_on:
+      - kafka
+    environment:
+      ZK_HOSTS: "zookeeper:2181"
+      APPLICATION_SECRET: "letmein"
+
+  kafka-to-es:
+    image: kafka-etl/kafka-to-es:latest
+    container_name: kafka-to-es
+    depends_on:
+      - kafka
+    extra_hosts:
+      kafka: 172.19.0.14
+      kafka2: 172.19.0.18
+    environment:
+      KAFKA_BROKER: 172.19.0.14
+
+  csv-to-kafka:
+    image: kafka-etl/csv-to-kafka:latest
+    container_name: csv-to-kafka
+    volumes:
+      - /opt/data:/opt/data
+    depends_on:
+      - kafka
+    extra_hosts:
+      kafka: 172.19.0.14
+      kafka2: 172.19.0.18
+    environment:
+      KAFKA_BROKER: 172.19.0.14
+
+volumes:
+  elasticsearch-data:
+    driver: local
+
+
+networks:
+  default:
+    external:
+      name: dockprom_monitor-net

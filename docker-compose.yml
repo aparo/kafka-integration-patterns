@@ -1,0 +1,52 @@
+version: "2"
+
+networks:
+  default:
+    external:
+      name: dockprom_monitor-net
+
+
+#
+# [ services definition ]
+#
+services:
+
+  kafka-to-es:
+    image: kafka-etl/kafka-to-es:latest
+    container_name: kafka-to-es
+    extra_hosts:
+      kafka-manager: 172.19.0.11
+      jmxexporter: 172.19.0.10
+      kafka: 172.19.0.16
+      zookeeper: 172.19.0.14
+      kibana: 172.19.0.12
+      cerebro: 172.19.0.13
+      elasticsearch: 172.19.0.15
+      prometheus: 172.19.0.5
+      cadvisor: 172.19.0.8
+      nodeexporter: 172.19.0.6
+      caddy: 172.19.0.7
+      alertmanager: 172.19.0.2
+      grafana: 172.19.0.4
+      pushgateway: 172.19.0.3
+
+  csv-to-kafka:
+    image: kafka-etl/csv-to-kafka:latest
+    container_name: csv-to-kafka
+    volumes:
+      - /opt/data:/opt/data
+    extra_hosts:
+      kafka-manager: 172.19.0.11
+      jmxexporter: 172.19.0.10
+      kafka: 172.19.0.16
+      zookeeper: 172.19.0.14
+      kibana: 172.19.0.12
+      cerebro: 172.19.0.13
+      elasticsearch: 172.19.0.15
+      prometheus: 172.19.0.5
+      cadvisor: 172.19.0.8
+      nodeexporter: 172.19.0.6
+      caddy: 172.19.0.7
+      alertmanager: 172.19.0.2
+      grafana: 172.19.0.4
+      pushgateway: 172.19.0.3
